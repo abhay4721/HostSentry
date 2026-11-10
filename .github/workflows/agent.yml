@@ -27,8 +27,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Download and verify modules
+        run: go mod download
+
       - name: Vet
-        if: matrix.arch == 'amd64'
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
         run: go vet ./...
 
       - name: Test on Linux
