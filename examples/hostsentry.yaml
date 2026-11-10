@@ -1,0 +1,10 @@
+# HostSentry standalone agent settings. Durations use Go duration syntax.
+interval: 30s
+process_limit: 20
+sustain_for: 2m
+
+# A value of 0 disables that threshold.
+thresholds:
+  cpu_percent: 90
+  memory_percent: 90
+  disk_percent: 90

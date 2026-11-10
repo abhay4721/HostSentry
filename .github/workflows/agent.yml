@@ -1,0 +1,43 @@
+name: Linux agent
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent:
+    name: Test and build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        if: matrix.arch == 'amd64'
+        run: go vet ./...
+
+      - name: Test on Linux
+        if: matrix.arch == 'amd64'
+        run: go test ./...
+
+      - name: Build Linux agent
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: go build -trimpath -o hostsentry-agent ./cmd/hostsentry-agent

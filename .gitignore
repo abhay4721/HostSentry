@@ -1,0 +1,5 @@
+/bin/
+/dist/
+*.tmp
+hostsentry.yaml
+!examples/hostsentry.yaml
