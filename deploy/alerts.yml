@@ -1,0 +1,31 @@
+groups:
+  - name: hostsentry-fleet
+    rules:
+      - alert: HostSentryAgentOffline
+        expr: time() - hostsentry_agent_heartbeat_timestamp_seconds > 120
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HostSentry agent {{ $labels.host_id }} is offline"
+      - alert: HostSentryHighCPU
+        expr: hostsentry_agent_cpu_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host {{ $labels.host_id }} has sustained high CPU"
+      - alert: HostSentryServiceDown
+        expr: hostsentry_service_status == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service }} is down on {{ $labels.host_id }}"
+      - alert: HostSentryResourceAnomaly
+        expr: hostsentry_resource_anomaly == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual {{ $labels.metric }} usage on {{ $labels.host_id }}"

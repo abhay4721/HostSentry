@@ -8,3 +8,26 @@ thresholds:
   cpu_percent: 90
   memory_percent: 90
   disk_percent: 90
+
+# Only these systemd service units are queried by the agent.
+services: []
+
+# Recovery is off until explicitly enabled and a unit allowlist/policy exists.
+recovery:
+  enabled: false
+  dry_run: true
+  allow_remote_policies: false
+  audit_log: /var/lib/hostsentry/recovery.jsonl
+  policies: []
+
+# Optional central reporting. Install a unique certificate for this host before
+# setting a URL; all configured certificate and queue paths must be absolute.
+# central:
+#   url: https://192.168.1.20:8444
+#   agent_id: arch-web-01
+#   ca_certificate: /etc/hostsentry/pki/ca.crt
+#   client_certificate: /etc/hostsentry/pki/agent.crt
+#   client_key: /etc/hostsentry/pki/agent.key
+#   queue_path: /var/lib/hostsentry/queue.jsonl
+#   queue_max_bytes: 10485760
+#   request_timeout: 10s

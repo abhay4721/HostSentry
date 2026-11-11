@@ -1,62 +1,59 @@
 # HostSentry
 
-HostSentry is a Linux host monitoring agent written in Go. It collects system and process statistics and writes them as JSON. It runs locally without a server or network connection.
+HostSentry is an open-source Linux fleet health agent and optional central dashboard. The agent can run by itself, collect real system metrics, and write JSON reports. The central deployment adds PostgreSQL-backed host and incident views, Prometheus, Grafana, and Alertmanager.
 
-## Features
+## Current capabilities
 
-- CPU utilization by core, CPU time counters, and load averages.
-- RAM, swap, and memory pressure when the kernel exposes it.
-- Filesystem capacity, inode use, read-only mounts, and disk I/O counters.
-- Network interface state and per-interface traffic counters.
-- A bounded process list with CPU, resident memory, thread count, status, and start time.
-- Configurable CPU, memory, and disk thresholds with sustained-duration checks.
-- JSON output to stdout or an atomically replaced report file.
+- CPU, memory, swap, disk, inode, disk I/O, network, process, OS, kernel, and uptime collection.
+- Configurable thresholds with sustained-duration evaluation.
+- Optional systemd service state over D-Bus.
+- Recovery disabled by default; when explicitly enabled, the only available action requests a restart of an allowlisted service, verifies the result, and records an audit entry.
+- Optional outbound mutual-TLS report delivery with an on-disk bounded queue and retry backoff.
+- PostgreSQL-backed central fleet, incident, recovery, host grouping, user, and audit APIs.
+- Responsive dashboard with role-based sign-in, host and group views, incidents, recovery policies, reports, and settings.
+- Optional SMTP, Telegram, and GitHub issue incident delivery, plus Prometheus, Grafana, and Alertmanager deployment.
+- Arch-compatible systemd installation that runs the agent as a non-root service account.
 
-The agent is read-only. It does not monitor systemd services, perform recovery, or send data to a central server.
+## Standalone Arch Linux agent
 
-## Build
-
-Requires Go 1.23 or newer.
-
-```sh
-go mod tidy
-go test ./...
-go build -o hostsentry-agent ./cmd/hostsentry-agent
-```
-
-Run once and print a report:
+Requires Go 1.25 or newer. Install Go with `sudo pacman -S go`, then run:
 
 ```sh
-./hostsentry-agent -once
+make fmt vet test build
+./bin/hostsentry-agent -once
+sudo ./scripts/install-agent.sh
 ```
 
-Write periodic reports to a file:
+See [agent operations](docs/agent.md) and [standalone deployment](docs/deployment.md).
+
+## Linux compatibility
+
+The agent targets systemd-based Ubuntu, Debian, Fedora, Arch Linux, and Amazon Linux 2023 hosts. It reads Linux procfs and systemd over the system D-Bus; collection permissions and service-manager policy vary by distribution. This workspace has been runtime-checked on Arch Linux, and CI builds/tests on Ubuntu. Fedora, Debian, and Amazon Linux runtime validation remains outstanding. The installer uses standard `systemd`, `getent`, `groupadd`, and `useradd` tools and does not install distribution packages.
+
+## Central deployment
+
+Requires Docker Engine with Compose and OpenSSL. Generate local certificates and secrets, then start the stack:
 
 ```sh
-./hostsentry-agent -config examples/hostsentry.yaml -output /var/lib/hostsentry/report.json
+./scripts/setup-central.sh 192.168.1.20
+docker compose up --build -d
 ```
 
-Logs are written to stderr. The output file is replaced atomically and uses mode `0640`; created directories use mode `0750`. Use `-version` to print the build version.
+The script defaults API and dashboard ports to localhost. Configure `HOSTSENTRY_API_BIND` in `.env` for monitored machines on the LAN, and open only the required port in the host firewall. Issue one client certificate per agent with `scripts/issue-agent-cert.sh <agent-id>`.
 
-## Configuration
-
-See [examples/hostsentry.yaml](examples/hostsentry.yaml). Durations use Go syntax such as `30s` and `2m`. Threshold values are percentages from 0 through 100. Set a threshold to `0` to disable it. An alert is included in the report after a value stays above its threshold for `sustain_for`. Disk thresholds are tracked separately for each mount point.
-
-## Report behavior
-
-Each report includes a `schema_version` and UTC collection timestamp. Collection errors are listed in `warnings`; other sections are still returned when possible. Network and disk I/O values are cumulative kernel counters, not rates. The process list is sorted by CPU use, then resident memory, and limited by `process_limit`.
-
-Process CPU values can be zero when a process has not accumulated measurable CPU time. Process and mount visibility depends on the account's permissions, kernel settings, and container boundaries. Run the agent as an ordinary user; do not grant broad privileges to remove individual warnings.
-
-## Linux support
-
-The collector uses Linux procfs and gopsutil's Linux interfaces. It is intended for systemd-based Ubuntu, Debian, Fedora, Arch Linux, and Amazon Linux 2023. The current agent does not interact with systemd. In containers, memory and mount readings may describe the container rather than the full machine. Memory pressure is optional and requires kernel support for Pressure Stall Information at `/proc/pressure/memory`.
+See [central deployment](docs/central-server.md) and the [API reference](docs/api.md).
 
 ## Development
 
-Run the test suite with `go test ./...`. The [Linux agent workflow](.github/workflows/agent.yml) runs tests and `go vet` on Ubuntu and builds Linux amd64 and arm64 binaries on pushes to `main` or `master`, pull requests, and manual dispatch.
+```sh
+make fmt vet test build
+```
 
-See [agent operation](docs/agent.md), [architecture](docs/architecture.md), and [security](docs/security.md).
+Go modules are pinned by `go.mod` and `go.sum`. The React application is under `frontend/`; its production bundle is built into the frontend image. See [architecture](docs/architecture.md) and [security](docs/security.md).
+
+## Project status
+
+HostSentry is under active development. SMTP and Telegram notification delivery is best-effort and is attempted once when an incident is first created. Review the [recovery guide](docs/recovery.md) and configure narrowly scoped systemd authorization before enabling live automatic recovery.
 
 ## License
 

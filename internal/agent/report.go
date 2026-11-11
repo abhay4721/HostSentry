@@ -7,30 +7,62 @@ import (
 )
 
 type Report struct {
-	SchemaVersion string         `json:"schema_version"`
-	CollectedAt   time.Time      `json:"collected_at"`
-	System        System         `json:"system"`
-	CPU           CPU            `json:"cpu"`
-	Memory        Memory         `json:"memory"`
-	Disks         []Disk         `json:"disks"`
-	DiskIO        []DiskIO       `json:"disk_io"`
-	Processes     []Process      `json:"processes"`
-	Interfaces    []NetInterface `json:"interfaces"`
-	Network       []NetCounters  `json:"network"`
-	Alerts        []Alert        `json:"alerts"`
-	Warnings      []string       `json:"warnings"`
+	SchemaVersion   string              `json:"schema_version"`
+	CollectedAt     time.Time           `json:"collected_at"`
+	PolicyVersion   int64               `json:"policy_version,omitempty"`
+	System          System              `json:"system"`
+	CPU             CPU                 `json:"cpu"`
+	Memory          Memory              `json:"memory"`
+	Disks           []Disk              `json:"disks"`
+	DiskIO          []DiskIO            `json:"disk_io"`
+	Processes       []Process           `json:"processes"`
+	Interfaces      []NetInterface      `json:"interfaces"`
+	Network         []NetCounters       `json:"network"`
+	Services        []ServiceState      `json:"services"`
+	Recoveries      []RecoveryExecution `json:"recoveries"`
+	Recommendations []Recommendation    `json:"recommendations"`
+	Alerts          []Alert             `json:"alerts"`
+	Warnings        []string            `json:"warnings"`
+}
+
+type RecoveryExecution struct {
+	Policy     string    `json:"policy"`
+	Service    string    `json:"service"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
+	Outcome    string    `json:"outcome"`
+	Verified   bool      `json:"verified"`
+	Error      string    `json:"error,omitempty"`
+}
+
+type Recommendation struct {
+	Type     string `json:"type"`
+	Severity string `json:"severity"`
+	Target   string `json:"target"`
+	Message  string `json:"message"`
+}
+
+type ServiceState struct {
+	Name        string    `json:"name"`
+	LoadState   string    `json:"load_state"`
+	ActiveState string    `json:"active_state"`
+	SubState    string    `json:"sub_state"`
+	MainPID     uint32    `json:"main_pid"`
+	Result      string    `json:"last_result,omitempty"`
+	Restarts    uint32    `json:"restart_count,omitempty"`
+	Since       time.Time `json:"since,omitempty"`
 }
 
 type System struct {
-	Hostname             string    `json:"hostname"`
-	OS                   string    `json:"os"`
-	Distribution         string    `json:"distribution"`
-	DistributionVersion  string    `json:"distribution_version,omitempty"`
-	KernelVersion        string    `json:"kernel_version"`
-	Architecture         string    `json:"architecture"`
-	BootTime             time.Time `json:"boot_time"`
-	UptimeSeconds        uint64    `json:"uptime_seconds"`
-	AgentVersion         string    `json:"agent_version"`
+	Hostname            string    `json:"hostname"`
+	OS                  string    `json:"os"`
+	Distribution        string    `json:"distribution"`
+	DistributionVersion string    `json:"distribution_version,omitempty"`
+	KernelVersion       string    `json:"kernel_version"`
+	Architecture        string    `json:"architecture"`
+	BootTime            time.Time `json:"boot_time"`
+	UptimeSeconds       uint64    `json:"uptime_seconds"`
+	AgentVersion        string    `json:"agent_version"`
 }
 
 type CPU struct {
@@ -45,28 +77,28 @@ type CPU struct {
 }
 
 type Memory struct {
-	TotalBytes      uint64   `json:"total_bytes"`
-	UsedBytes       uint64   `json:"used_bytes"`
-	AvailableBytes  uint64   `json:"available_bytes"`
-	UsagePercent    float64  `json:"usage_percent"`
-	SwapTotalBytes  uint64   `json:"swap_total_bytes"`
-	SwapUsedBytes   uint64   `json:"swap_used_bytes"`
-	SwapPercent     float64  `json:"swap_usage_percent"`
-	PressureAvg10   *float64 `json:"memory_pressure_avg10,omitempty"`
+	TotalBytes     uint64   `json:"total_bytes"`
+	UsedBytes      uint64   `json:"used_bytes"`
+	AvailableBytes uint64   `json:"available_bytes"`
+	UsagePercent   float64  `json:"usage_percent"`
+	SwapTotalBytes uint64   `json:"swap_total_bytes"`
+	SwapUsedBytes  uint64   `json:"swap_used_bytes"`
+	SwapPercent    float64  `json:"swap_usage_percent"`
+	PressureAvg10  *float64 `json:"memory_pressure_avg10,omitempty"`
 }
 
 type Disk struct {
-	Device         string  `json:"device"`
-	Mountpoint     string  `json:"mountpoint"`
-	Filesystem     string  `json:"filesystem"`
-	ReadOnly       bool    `json:"read_only"`
-	TotalBytes     uint64  `json:"total_bytes"`
-	UsedBytes      uint64  `json:"used_bytes"`
-	FreeBytes      uint64  `json:"free_bytes"`
-	UsagePercent   float64 `json:"usage_percent"`
-	InodesTotal    uint64  `json:"inodes_total,omitempty"`
-	InodesUsed     uint64  `json:"inodes_used,omitempty"`
-	InodesPercent  float64 `json:"inodes_usage_percent,omitempty"`
+	Device        string  `json:"device"`
+	Mountpoint    string  `json:"mountpoint"`
+	Filesystem    string  `json:"filesystem"`
+	ReadOnly      bool    `json:"read_only"`
+	TotalBytes    uint64  `json:"total_bytes"`
+	UsedBytes     uint64  `json:"used_bytes"`
+	FreeBytes     uint64  `json:"free_bytes"`
+	UsagePercent  float64 `json:"usage_percent"`
+	InodesTotal   uint64  `json:"inodes_total,omitempty"`
+	InodesUsed    uint64  `json:"inodes_used,omitempty"`
+	InodesPercent float64 `json:"inodes_usage_percent,omitempty"`
 }
 
 type DiskIO struct {
@@ -97,15 +129,17 @@ type NetInterface struct {
 }
 
 type NetCounters struct {
-	Name      string `json:"name"`
-	RXBytes   uint64 `json:"rx_bytes"`
-	TXBytes   uint64 `json:"tx_bytes"`
-	RXPackets uint64 `json:"rx_packets"`
-	TXPackets uint64 `json:"tx_packets"`
-	RXErrors  uint64 `json:"rx_errors"`
-	TXErrors  uint64 `json:"tx_errors"`
-	RXDrops   uint64 `json:"rx_drops"`
-	TXDrops   uint64 `json:"tx_drops"`
+	Name             string  `json:"name"`
+	RXBytes          uint64  `json:"rx_bytes"`
+	TXBytes          uint64  `json:"tx_bytes"`
+	RXBytesPerSecond float64 `json:"rx_bytes_per_second"`
+	TXBytesPerSecond float64 `json:"tx_bytes_per_second"`
+	RXPackets        uint64  `json:"rx_packets"`
+	TXPackets        uint64  `json:"tx_packets"`
+	RXErrors         uint64  `json:"rx_errors"`
+	TXErrors         uint64  `json:"tx_errors"`
+	RXDrops          uint64  `json:"rx_drops"`
+	TXDrops          uint64  `json:"tx_drops"`
 }
 
 type Alert struct {
@@ -123,27 +157,39 @@ func NewEvaluator() *Evaluator { return &Evaluator{state: make(map[string]thresh
 
 func (e *Evaluator) Evaluate(report Report, thresholds Thresholds, sustain time.Duration, now time.Time) []Alert {
 	checks := []struct {
-		key string
+		key          string
 		value, limit float64
 	}{
 		{"cpu", report.CPU.UsagePercent, thresholds.CPUPercent},
 		{"memory", report.Memory.UsagePercent, thresholds.MemoryPercent},
 	}
 	for _, disk := range report.Disks {
-		checks = append(checks, struct { key string; value, limit float64 }{fmt.Sprintf("disk:%s", disk.Mountpoint), disk.UsagePercent, thresholds.DiskPercent})
+		checks = append(checks, struct {
+			key          string
+			value, limit float64
+		}{fmt.Sprintf("disk:%s", disk.Mountpoint), disk.UsagePercent, thresholds.DiskPercent})
 	}
 	active := make(map[string]bool, len(checks))
 	alerts := make([]Alert, 0)
 	for _, check := range checks {
-		if check.limit <= 0 || check.value <= check.limit { continue }
+		if check.limit <= 0 || check.value <= check.limit {
+			continue
+		}
 		active[check.key] = true
 		state, ok := e.state[check.key]
-		if !ok { state.aboveSince = now; e.state[check.key] = state }
+		if !ok {
+			state.aboveSince = now
+			e.state[check.key] = state
+		}
 		if now.Sub(state.aboveSince) >= sustain {
 			alerts = append(alerts, Alert{Metric: check.key, Value: check.value, Threshold: check.limit, Since: state.aboveSince, Message: fmt.Sprintf("%s usage %.1f%% has remained above %.1f%%", check.key, check.value, check.limit)})
 		}
 	}
-	for key := range e.state { if !active[key] { delete(e.state, key) } }
+	for key := range e.state {
+		if !active[key] {
+			delete(e.state, key)
+		}
+	}
 	sort.Slice(alerts, func(i, j int) bool { return alerts[i].Metric < alerts[j].Metric })
 	return alerts
 }

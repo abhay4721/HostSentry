@@ -1,0 +1,33 @@
+{
+	admin off
+}
+
+:8443 {
+	tls /etc/hostsentry/pki/server.crt /etc/hostsentry/pki/server.key
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Content-Security-Policy "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	@api path_regexp api ^(/api/|/healthz$)
+	handle @api {
+		reverse_proxy https://backend:8443 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				tls_trust_pool file /etc/hostsentry/pki/ca.crt
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

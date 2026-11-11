@@ -1,0 +1,61 @@
+name: Security checks
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go-vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...
+
+  filesystem-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  container-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build backend image
+        run: docker build -f backend.Dockerfile -t hostsentry-backend:ci .
+      - name: Build dashboard image
+        run: docker build -f frontend.Dockerfile -t hostsentry-frontend:ci .
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: image
+          image-ref: hostsentry-backend:ci
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+      - name: Scan dashboard image
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: image
+          image-ref: hostsentry-frontend:ci
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          exit-code: '1'

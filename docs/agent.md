@@ -10,8 +10,12 @@ The output file path is replaced using a temporary file in the same directory fo
 
 The report has a top-level `schema_version`, UTC `collected_at`, system information, CPU, memory, disks, disk I/O, processes, interfaces, network counters, alerts, and warnings. `schema_version` changes when the report contract needs an incompatible update.
 
+Configured `services` are read over the systemd D-Bus. The agent only queries names in this list and reports active state, substate, main PID, result, restart count, and active-since time. A D-Bus permission or unit lookup failure is added to `warnings`.
+
 CPU utilization is a snapshot; disk and network I/O values are cumulative counters from the kernel. Rates can be calculated by comparing counter values across reports. Process entries are limited by `process_limit`, sorted by CPU and then resident memory.
 
 ## Threshold behavior
 
-CPU and memory each have one threshold. Disk thresholds are tracked per mount point. A value must stay strictly above its threshold for `sustain_for`; returning to or below the threshold resets its timer. Timers are held in memory and reset when the agent restarts. Alerts are included in the report; the agent does not persist incidents or perform recovery.
+CPU and memory each have one threshold. Disk thresholds are tracked per mount point. A value must stay strictly above its threshold for `sustain_for`; returning to or below the threshold resets its timer. Timers are held in memory and reset when the agent restarts. Alerts are included in the report; the agent does not persist incidents.
+
+Recovery is disabled by default. When explicitly enabled, only configured policies for services in the `services` allowlist are eligible. The only action is requesting a systemd restart over D-Bus, followed by checking that the unit becomes active. Dry-run mode, retry caps, cooldowns, execution timeouts, and a JSONL audit log are supported. The service account needs narrowly scoped systemd authorization to restart units; the installer does not grant it.

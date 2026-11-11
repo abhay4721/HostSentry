@@ -1,0 +1,23 @@
+{
+  "id": null,
+  "uid": "hostsentry-fleet",
+  "title": "HostSentry Fleet Overview",
+  "tags": ["hostsentry"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {"id":1,"type":"timeseries","title":"CPU utilization by host","gridPos":{"h":8,"w":12,"x":0,"y":0},"targets":[{"expr":"hostsentry_agent_cpu_usage_percent","legendFormat":"{{host_id}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":2,"type":"timeseries","title":"Memory utilization by host","gridPos":{"h":8,"w":12,"x":12,"y":0},"targets":[{"expr":"hostsentry_agent_memory_usage_percent","legendFormat":"{{host_id}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":3,"type":"timeseries","title":"systemd service availability","gridPos":{"h":8,"w":12,"x":0,"y":8},"targets":[{"expr":"hostsentry_service_status","legendFormat":"{{host_id}} / {{service}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":4,"type":"timeseries","title":"Incidents by status","gridPos":{"h":8,"w":12,"x":12,"y":8},"targets":[{"expr":"hostsentry_incidents_total","legendFormat":"{{status}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":5,"type":"timeseries","title":"Recovery attempts","gridPos":{"h":8,"w":24,"x":0,"y":16},"targets":[{"expr":"hostsentry_recovery_attempts_total","legendFormat":"{{outcome}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":6,"type":"timeseries","title":"Filesystem utilization","gridPos":{"h":8,"w":12,"x":0,"y":24},"targets":[{"expr":"hostsentry_agent_disk_usage_percent","legendFormat":"{{host_id}} · {{mountpoint}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":7,"type":"timeseries","title":"Network throughput","gridPos":{"h":8,"w":12,"x":12,"y":24},"targets":[{"expr":"hostsentry_agent_network_receive_bytes_per_second","legendFormat":"{{host_id}} {{interface}} RX","refId":"A"},{"expr":"hostsentry_agent_network_transmit_bytes_per_second","legendFormat":"{{host_id}} {{interface}} TX","refId":"B"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":8,"type":"timeseries","title":"Memory used","gridPos":{"h":8,"w":12,"x":0,"y":32},"targets":[{"expr":"hostsentry_agent_memory_usage_bytes","legendFormat":"{{host_id}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}},
+    {"id":9,"type":"timeseries","title":"Host uptime","gridPos":{"h":8,"w":12,"x":12,"y":32},"targets":[{"expr":"hostsentry_agent_uptime_seconds","legendFormat":"{{host_id}}","refId":"A"}],"datasource":{"type":"prometheus","uid":"hostsentry-prometheus"}}
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []}
+}

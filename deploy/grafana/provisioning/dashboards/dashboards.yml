@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: HostSentry
+    orgId: 1
+    folder: HostSentry
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards

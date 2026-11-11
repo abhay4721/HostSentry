@@ -3,3 +3,10 @@
 *.tmp
 hostsentry.yaml
 !examples/hostsentry.yaml
+/.env
+/pki/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/playwright-report/
+/frontend/test-results/
+/frontend/*.tsbuildinfo

@@ -48,18 +48,58 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	collector := agent.NewCollector(version, cfg.ProcessLimit)
+	collector := agent.NewCollector(version, cfg.ProcessLimit, cfg.Services...)
 	evaluator := agent.NewEvaluator()
+	recovery := agent.NewRecoveryEngine(cfg.Recovery.AuditLog)
+	effectiveRecovery := cfg.Recovery
 	logger := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	var remote *agent.RemoteReporter
+	if cfg.Central.URL != "" {
+		remote, err = agent.NewRemoteReporter(cfg.Central)
+		if err != nil {
+			return err
+		}
+		if !*once {
+			go remote.Run(ctx, logger)
+		}
+	}
+	var currentPolicyVersion int64
 
 	write := func() error {
 		report, collectErr := collector.Collect(ctx)
 		if collectErr != nil {
 			return collectErr
 		}
+		report.PolicyVersion = currentPolicyVersion
+		report.Recoveries = []agent.RecoveryExecution{}
 		report.Alerts = evaluator.Evaluate(report, cfg.Thresholds, cfg.SustainFor.Value(), report.CollectedAt)
+		if remote != nil && cfg.Recovery.AllowRemotePolicies {
+			bundle, syncErr := remote.FetchPolicies(ctx)
+			if syncErr != nil {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("central policy sync: %v", syncErr))
+			} else {
+				candidate := cfg
+				candidate.Recovery.Policies = bundle.Policies
+				if validateErr := candidate.Validate(); validateErr != nil {
+					report.Warnings = append(report.Warnings, fmt.Sprintf("central policy rejected: %v", validateErr))
+				} else {
+					effectiveRecovery = cfg.Recovery
+					effectiveRecovery.Policies = bundle.Policies
+					effectiveRecovery.Enabled = cfg.Recovery.Enabled && bundle.Enabled
+					effectiveRecovery.DryRun = cfg.Recovery.DryRun || bundle.DryRun
+					currentPolicyVersion = bundle.Version
+					report.PolicyVersion = currentPolicyVersion
+				}
+			}
+		}
+		report.Recoveries, report.Warnings = appendRecoveries(report, recovery, effectiveRecovery, ctx)
+		if remote != nil {
+			if err := remote.Enqueue(report); err != nil {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("central queue: %v", err))
+			}
+		}
 		data, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			return fmt.Errorf("encode report: %w", err)
@@ -71,6 +111,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}
 		if err != nil {
 			return err
+		}
+		if remote != nil && *once {
+			if err := remote.Flush(ctx); err != nil {
+				logger.Warn("central report delivery deferred", "error", err)
+			}
 		}
 		logger.Info("health report collected", "host", report.System.Hostname, "warnings", len(report.Warnings), "alerts", len(report.Alerts))
 		return nil
@@ -93,6 +138,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 			}
 		}
 	}
+}
+
+func appendRecoveries(report agent.Report, engine *agent.RecoveryEngine, cfg agent.RecoveryConfig, ctx context.Context) ([]agent.RecoveryExecution, []string) {
+	executions, warnings := engine.Evaluate(ctx, report.Services, cfg, report.CollectedAt)
+	return executions, append(report.Warnings, warnings...)
 }
 
 func writeReport(path string, data []byte) error {
@@ -122,6 +172,12 @@ func writeReport(path string, data []byte) error {
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("publish report: %w", err)
+	}
+	if directory, err := os.Open(filepath.Dir(path)); err == nil {
+		defer directory.Close()
+		if err := directory.Sync(); err != nil {
+			return fmt.Errorf("sync report directory: %w", err)
+		}
 	}
 	return nil
 }

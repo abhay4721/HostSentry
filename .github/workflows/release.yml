@@ -1,0 +1,37 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build Linux binaries
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            for component in agent server; do
+              go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o "dist/hostsentry-${component}-linux-${arch}" "./cmd/hostsentry-${component}"
+            done
+          done
+          cd dist
+          sha256sum hostsentry-* > SHA256SUMS
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

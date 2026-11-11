@@ -1,0 +1,149 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hostsentry
+      POSTGRES_USER: hostsentry
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hostsentry -d hostsentry"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    restart: unless-stopped
+    user: "${HOSTSENTRY_CONTAINER_UID:-1000}:${HOSTSENTRY_CONTAINER_GID:-1000}"
+    environment:
+      HOSTSENTRY_DATABASE_URL: postgres://hostsentry:${POSTGRES_PASSWORD}@postgres:5432/hostsentry?sslmode=disable
+      HOSTSENTRY_PROMETHEUS_URL: ${HOSTSENTRY_PROMETHEUS_URL:-http://prometheus:9090}
+      HOSTSENTRY_BOOTSTRAP_ADMIN_EMAIL: ${HOSTSENTRY_BOOTSTRAP_ADMIN_EMAIL:-}
+      HOSTSENTRY_BOOTSTRAP_ADMIN_PASSWORD: ${HOSTSENTRY_BOOTSTRAP_ADMIN_PASSWORD:-}
+      HOSTSENTRY_METRICS_TOKEN: ${HOSTSENTRY_METRICS_TOKEN:?Set HOSTSENTRY_METRICS_TOKEN in .env}
+      HOSTSENTRY_HEALTH_WEIGHTS: ${HOSTSENTRY_HEALTH_WEIGHTS:-}
+      HOSTSENTRY_RECOVERY_ENABLED: ${HOSTSENTRY_RECOVERY_ENABLED:-false}
+      HOSTSENTRY_RECOVERY_DRY_RUN: ${HOSTSENTRY_RECOVERY_DRY_RUN:-true}
+      HOSTSENTRY_ANOMALY_ENABLED: ${HOSTSENTRY_ANOMALY_ENABLED:-true}
+      HOSTSENTRY_ANOMALY_MIN_SAMPLES: ${HOSTSENTRY_ANOMALY_MIN_SAMPLES:-20}
+      HOSTSENTRY_ANOMALY_SIGMA: ${HOSTSENTRY_ANOMALY_SIGMA:-3}
+      HOSTSENTRY_NOTIFY_SEVERITIES: ${HOSTSENTRY_NOTIFY_SEVERITIES:-critical,warning}
+      HOSTSENTRY_NOTIFY_TYPES: ${HOSTSENTRY_NOTIFY_TYPES:-}
+      HOSTSENTRY_TELEGRAM_BOT_TOKEN: ${HOSTSENTRY_TELEGRAM_BOT_TOKEN:-}
+      HOSTSENTRY_TELEGRAM_CHAT_ID: ${HOSTSENTRY_TELEGRAM_CHAT_ID:-}
+      HOSTSENTRY_GITHUB_TOKEN: ${HOSTSENTRY_GITHUB_TOKEN:-}
+      HOSTSENTRY_GITHUB_REPOSITORY: ${HOSTSENTRY_GITHUB_REPOSITORY:-}
+      HOSTSENTRY_GITHUB_LABELS: ${HOSTSENTRY_GITHUB_LABELS:-}
+      HOSTSENTRY_SMTP_ADDRESS: ${HOSTSENTRY_SMTP_ADDRESS:-}
+      HOSTSENTRY_SMTP_USERNAME: ${HOSTSENTRY_SMTP_USERNAME:-}
+      HOSTSENTRY_SMTP_PASSWORD: ${HOSTSENTRY_SMTP_PASSWORD:-}
+      HOSTSENTRY_SMTP_FROM: ${HOSTSENTRY_SMTP_FROM:-}
+      HOSTSENTRY_SMTP_TO: ${HOSTSENTRY_SMTP_TO:-}
+      HOSTSENTRY_TLS_CERT: /etc/hostsentry/pki/server.crt
+      HOSTSENTRY_TLS_KEY: /etc/hostsentry/pki/server.key
+      HOSTSENTRY_CLIENT_CA: /etc/hostsentry/pki/ca.crt
+      HOSTSENTRY_LISTEN_ADDR: :8443
+    volumes:
+      - ./pki:/etc/hostsentry/pki:ro
+    ports:
+      - "${HOSTSENTRY_API_BIND:-127.0.0.1}:8444:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--cacert", "/etc/hostsentry/pki/ca.crt", "https://localhost:8443/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [internal]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid"]
+    security_opt: [no-new-privileges:true]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    restart: unless-stopped
+    user: "${HOSTSENTRY_CONTAINER_UID:-1000}:${HOSTSENTRY_CONTAINER_GID:-1000}"
+    volumes:
+      - ./pki:/etc/hostsentry/pki:ro
+    ports:
+      - "${HOSTSENTRY_UI_BIND:-127.0.0.1}:8443:8443"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./pki/ca.crt:/etc/hostsentry/pki/ca.crt:ro
+      - ./pki/prometheus.token:/etc/hostsentry/pki/prometheus.token:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+      alertmanager:
+        condition: service_started
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - ./deploy/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on: [prometheus]
+    networks: [internal]
+    security_opt: [no-new-privileges:true]
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:
