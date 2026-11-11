@@ -14,6 +14,16 @@ HostSentry is an open-source Linux fleet health agent and optional central dashb
 - Optional SMTP, Telegram, and GitHub issue incident delivery, plus Prometheus, Grafana, and Alertmanager deployment.
 - Arch-compatible systemd installation that runs the agent as a non-root service account.
 
+## Dashboard screenshots
+
+### Fleet overview
+
+![HostSentry fleet overview](docs/images/fleet-overview.png)
+
+### Host inventory
+
+![HostSentry host inventory](docs/images/host-list.png)
+
 ## Standalone Arch Linux agent
 
 Requires Go 1.25 or newer. Install Go with `sudo pacman -S go`, then run:
